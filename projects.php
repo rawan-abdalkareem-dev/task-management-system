@@ -1,3 +1,15 @@
+<?php
+// جلب الاتصال بقاعدة البيانات
+require_once 'db.php';
+
+try {
+    // جلب كافة المشاريع من قاعدة البيانات من الأحدث للأقدم
+    $stmt = $pdo->query("SELECT * FROM projects ORDER BY id DESC");
+    $projects = $stmt->fetchAll();
+} catch (PDOException $e) {
+    die("خطأ في جلب المشاريع: " . $e->getMessage());
+}
+?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -13,9 +25,9 @@
         <div class="sidebar">
             <h2>لوحة التحكم</h2>
             <ul>
-                <li><a href="projects.html" class="active">المشاريع</a></li>
-                <li><a href="tasks.html">المهام</a></li>
-                <li><a href="kanban.html">لوحة كانبان</a></li>
+                <li><a href="projects.php" class="active">المشاريع</a></li>
+                <!-- تم التعديل إلى tasks.php -->
+                <li><a href="tasks.php">المهام</a></li>
             </ul>
         </div>
 
@@ -26,7 +38,7 @@
                 <button class="btn-primary" onclick="openProjectModal()">+ إضافة مشروع جديد</button>
             </header>
 
-            <!-- جدول عرض المشاريع (SUB-2.1.3) -->
+            <!-- جدول عرض المشاريع -->
             <section class="table-section">
                 <table>
                     <thead>
@@ -40,28 +52,36 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>1</td>
-                            <td>تطوير نظام الجامعة</td>
-                            <td>بناء منصة SaaS تعليمية متكاملة</td>
-                            <td>2026-09-01</td>
-                            <td>2026-10-01</td>
-                            <td>
-                                <button class="btn-action edit" onclick="openProjectModal()">تعديل</button>
-                            </td>
-                        </tr>
+                        <?php if (empty($projects)): ?>
+                            <tr>
+                                <td colspan="6" style="text-align: center;">لا يوجد مشاريع مضافة حتى الآن.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($projects as $project): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($project['id']); ?></td>
+                                    <td><?php echo htmlspecialchars($project['name']); ?></td>
+                                    <td><?php echo htmlspecialchars($project['description']); ?></td>
+                                    <td><?php echo htmlspecialchars($project['start_date']); ?></td>
+                                    <td><?php echo htmlspecialchars($project['expected_end_date']); ?></td>
+                                    <td>
+                                        <button class="btn-action edit" onclick="openProjectModal()">تعديل</button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </section>
         </div>
     </div>
 
-    <!-- نموذج إنشاء/تعديل المشروع - متطابق مع DB (SUB-2.1.1) -->
+    <!-- نموذج إنشاء/تعديل المشروع -->
     <div id="projectModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeProjectModal()">&times;</span>
             <h2>إضافة مشروع جديد</h2>
-            <form action="#" method="POST">
+            <form action="add_project.php" method="POST">
                 <div class="form-group">
                     <label for="name">اسم المشروع (name):</label>
                     <input type="text" id="name" name="name" placeholder="أدخل اسم المشروع" required>
