@@ -174,3 +174,21 @@ th {
 .btn:hover {
     background-color: #218838;
 }
+/* تنسيق الشارات (Badges) */
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: white;
+    font-weight: bold;
+}
+
+/* الأولوية */
+.badge.high { background-color: #dc3545; }
+.badge.medium { background-color: #ffc107; color: #333; }
+.badge.low { background-color: #28a745; }
+
+/* الحالة */
+.badge.new { background-color: #17a2b8; }
+.badge.in_progress { background-color: #007bff; }
+.badge.completed { background-color: #28a745; }
