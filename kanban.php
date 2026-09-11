@@ -37,6 +37,8 @@ try {
                 <li><a href="projects.php">المشاريع</a></li>
                 <li><a href="tasks.php">المهام</a></li>
                 <li><a href="kanban.php" class="active">لوحة كانبان</a></li>
+                <li><a href="activity_log.php">سجل النشاط</a></li>
+                <li><a href="report.php">تقارير المشروع</a></li>
             </ul>
         </div>
 

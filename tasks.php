@@ -41,6 +41,8 @@ try {
                 <li><a href="projects.php">المشاريع</a></li>
                 <li><a href="tasks.php" class="active">المهام</a></li>
                 <li><a href="kanban.php">لوحة كانبان</a></li>
+                <li><a href="activity_log.php">سجل النشاط</a></li>
+                <li><a href="report.php">تقارير المشروع</a></li>
             </ul>
         </div>
 
