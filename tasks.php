@@ -16,8 +16,8 @@ try {
     $projects = $pdo->query("SELECT id, name FROM projects ORDER BY name ASC")->fetchAll();
     $parent_task_options = $pdo->query("SELECT id, title FROM tasks WHERE parent_id IS NULL ORDER BY title ASC")->fetchAll();
 
-    // قائمة المستخدمين الثابتة
-    $static_users = ['rawan', 'sara', 'lujain', 'hala'];
+    // 3. جلب الأعضاء ديناميكياً من جدول users (SUB-4.1.1)
+    $team_members = $pdo->query("SELECT id, name FROM users ORDER BY name ASC")->fetchAll();
 
 } catch (PDOException $e) {
     die("خطأ في جلب البيانات: " . $e->getMessage());
@@ -151,13 +151,13 @@ try {
                     <textarea id="description" name="description" rows="3" placeholder="تفاصيل المهمة..."></textarea>
                 </div>
 
-                <!-- قائمة المسند إليه الثابتة -->
+                <!-- قائمة المسند إليه الديناميكية من جدول users -->
                 <div class="form-group">
                     <label for="assigned_to">إسناد / توزيع إلى عضو الفريق:</label>
                     <select id="assigned_to" name="assigned_to">
                         <option value="">-- بدون إسناد --</option>
-                        <?php foreach ($static_users as $user): ?>
-                            <option value="<?php echo $user; ?>"><?php echo $user; ?></option>
+                        <?php foreach ($team_members as $member): ?>
+                            <option value="<?php echo htmlspecialchars($member['name']); ?>"><?php echo htmlspecialchars($member['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
