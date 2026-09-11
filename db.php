@@ -2,7 +2,7 @@
 $host   = "localhost";
 $user   = "root";
 $pass   = "";
-$dbname = "project_management"; // تم التعديل ليطابق الاسم الموجود بالصورة
+$dbname = "project_management";
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
