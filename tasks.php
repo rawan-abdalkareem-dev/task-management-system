@@ -2,21 +2,22 @@
 require_once 'db.php';
 
 try {
-    // 1. جلب كافة المهام مع بيانات المشروع والمستخدم المسند إليه
+    // 1. جلب المهام مع اسم المشروع واسم المهمة الرئيسية التابعة لها
     $stmt = $pdo->query("SELECT tasks.*, 
                                 projects.name AS project_name, 
-                                users.name AS user_name 
+                                parent_tasks.title AS parent_title
                          FROM tasks 
                          LEFT JOIN projects ON tasks.project_id = projects.id 
-                         LEFT JOIN users ON tasks.assigned_to = users.id 
+                         LEFT JOIN tasks AS parent_tasks ON tasks.parent_id = parent_tasks.id
                          ORDER BY tasks.id DESC");
     $tasks = $stmt->fetchAll();
 
-    // 2. جلب المشاريع لقائمة الاختيار
+    // 2. جلب البيانات للقوائم المنسدلة
     $projects = $pdo->query("SELECT id, name FROM projects ORDER BY name ASC")->fetchAll();
+    $parent_task_options = $pdo->query("SELECT id, title FROM tasks WHERE parent_id IS NULL ORDER BY title ASC")->fetchAll();
 
-    // 3. جلب المستخدمين لقائمة الاختيار
-    $users = $pdo->query("SELECT id, name FROM users ORDER BY name ASC")->fetchAll();
+    // قائمة المستخدمين الثابتة
+    $static_users = ['rawan', 'sara', 'lujain', 'hala'];
 
 } catch (PDOException $e) {
     die("خطأ في جلب البيانات: " . $e->getMessage());
@@ -39,6 +40,7 @@ try {
             <ul>
                 <li><a href="projects.php">المشاريع</a></li>
                 <li><a href="tasks.php" class="active">المهام</a></li>
+                <li><a href="kanban.php">لوحة كانبان</a></li>
             </ul>
         </div>
 
@@ -46,38 +48,52 @@ try {
         <div class="main-content">
             <header>
                 <h1>إدارة المهام</h1>
-                <button class="btn-primary" onclick="openTaskModal()">+ إضافة مهمة جديدة</button>
+                <button class="btn-primary" onclick="openAddTaskModal()">+ إضافة مهمة جديدة</button>
             </header>
 
-            <!-- جدول عرض المهام -->
             <section class="table-section">
                 <table>
                     <thead>
                         <tr>
                             <th>#</th>
                             <th>عنوان المهمة</th>
+                            <th>نوع المهمة</th>
                             <th>المشروع</th>
                             <th>المسند إليه</th>
-                            <th>الوصف</th>
                             <th>الأولوية</th>
                             <th>الحالة</th>
+                            <th>الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($tasks)): ?>
                             <tr>
-                                <td colspan="7" style="text-align: center;">لا يوجد مهام مضافة حتى الآن.</td>
+                                <td colspan="8" style="text-align: center;">لا يوجد مهام مضافة حتى الآن.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($tasks as $task): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($task['id']); ?></td>
-                                    <td><?php echo htmlspecialchars($task['title']); ?></td>
+                                    <td>
+                                        <?php if (!empty($task['parent_id'])): ?>
+                                            <span style="color: #888;">↳ </span>
+                                        <?php endif; ?>
+                                        <?php echo htmlspecialchars($task['title']); ?>
+                                    </td>
+                                    <td>
+                                        <?php if (empty($task['parent_id'])): ?>
+                                            <span style="font-weight: bold; color: #2c3e50;">رئيسية</span>
+                                        <?php else: ?>
+                                            <span>فرعية للمهمة الرئيسية: <strong><?php echo htmlspecialchars($task['parent_title'] ?? ''); ?></strong></span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($task['project_name'] ?? 'غير محدد'); ?></td>
-                                    <td><?php echo htmlspecialchars($task['user_name'] ?? 'غير مسند'); ?></td>
-                                    <td><?php echo htmlspecialchars($task['description']); ?></td>
+                                    <td><?php echo htmlspecialchars($task['assigned_to'] ?? 'غير مسند'); ?></td>
                                     <td><span class="badge <?php echo htmlspecialchars($task['priority']); ?>"><?php echo htmlspecialchars($task['priority']); ?></span></td>
                                     <td><span class="badge <?php echo htmlspecialchars($task['status']); ?>"><?php echo htmlspecialchars($task['status']); ?></span></td>
+                                    <td>
+                                        <button class="btn-action edit" onclick='openEditTaskModal(<?php echo json_encode($task); ?>)'>تعديل</button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -87,14 +103,16 @@ try {
         </div>
     </div>
 
-    <!-- نموذج إضافة مهمة جديدة -->
+    <!-- النافذة المنبثقة (Modal) للإضافة والتعديل -->
     <div id="taskModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeTaskModal()">&times;</span>
-            <h2>إضافة مهمة جديدة</h2>
-            <form action="add_task.php" method="POST">
+            <h2 id="modalTitle">إضافة مهمة جديدة</h2>
+            <form action="save_task.php" method="POST">
+                <input type="hidden" id="task_id" name="task_id" value="">
+
                 <div class="form-group">
-                    <label for="project_id">المشروع التابع له (project_id):</label>
+                    <label for="project_id">المشروع التابع له:</label>
                     <select id="project_id" name="project_id" required>
                         <option value="">-- اختر المشروع --</option>
                         <?php foreach ($projects as $proj): ?>
@@ -103,28 +121,49 @@ try {
                     </select>
                 </div>
 
+                <!-- نوع المهمة: رئيسية أو فرعية -->
                 <div class="form-group">
-                    <label for="title">عنوان المهمة (title):</label>
-                    <input type="text" id="title" name="title" placeholder="أدخل عنوان المهمة" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="description">وصف المهمة (description):</label>
-                    <textarea id="description" name="description" rows="3" placeholder="تفاصيل المهمة..."></textarea>
+                    <label for="task_type">نوع المهمة:</label>
+                    <select id="task_type" onchange="toggleParentTaskSelect()">
+                        <option value="main">رئيسية</option>
+                        <option value="sub">فرعية</option>
+                    </select>
                 </div>
 
-                <div class="form-group">
-                    <label for="assigned_to">إسناد إلى مستخدم (assigned_to):</label>
-                    <select id="assigned_to" name="assigned_to">
-                        <option value="">-- بدون إسناد --</option>
-                        <?php foreach ($users as $usr): ?>
-                            <option value="<?php echo $usr['id']; ?>"><?php echo htmlspecialchars($usr['name']); ?></option>
+                <!-- قائمة التحديد للمهمة الرئيسية (تظهر عند اختيار "فرعية" فقط) -->
+                <div class="form-group" id="parent_task_group" style="display: none;">
+                    <label for="parent_id">حدد المهمة الرئيسية التابعة لها:</label>
+                    <select id="parent_id" name="parent_id">
+                        <option value="">-- اختر المهمة الرئيسية --</option>
+                        <?php foreach ($parent_task_options as $p_task): ?>
+                            <option value="<?php echo $p_task['id']; ?>"><?php echo htmlspecialchars($p_task['title']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label for="priority">الأولوية (priority):</label>
+                    <label for="title">عنوان المهمة:</label>
+                    <input type="text" id="title" name="title" placeholder="أدخل عنوان المهمة" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">وصف المهمة:</label>
+                    <textarea id="description" name="description" rows="3" placeholder="تفاصيل المهمة..."></textarea>
+                </div>
+
+                <!-- قائمة المسند إليه الثابتة -->
+                <div class="form-group">
+                    <label for="assigned_to">إسناد / توزيع إلى عضو الفريق:</label>
+                    <select id="assigned_to" name="assigned_to">
+                        <option value="">-- بدون إسناد --</option>
+                        <?php foreach ($static_users as $user): ?>
+                            <option value="<?php echo $user; ?>"><?php echo $user; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="priority">الأولوية:</label>
                     <select id="priority" name="priority">
                         <option value="high">عالية (high)</option>
                         <option value="medium" selected>متوسطة (medium)</option>
@@ -133,7 +172,7 @@ try {
                 </div>
 
                 <div class="form-group">
-                    <label for="status">الحالة (status):</label>
+                    <label for="status">الحالة:</label>
                     <select id="status" name="status">
                         <option value="new" selected>جديد (new)</option>
                         <option value="in_progress">قيد العمل (in_progress)</option>
@@ -141,15 +180,62 @@ try {
                     </select>
                 </div>
 
-                <button type="submit" class="btn">حفظ المهمة</button>
+                <button type="submit" class="btn" id="submitBtn">حفظ المهمة</button>
             </form>
         </div>
     </div>
 
     <script>
-        function openTaskModal() {
+        function toggleParentTaskSelect() {
+            var taskType = document.getElementById('task_type').value;
+            var parentGroup = document.getElementById('parent_task_group');
+            if (taskType === 'sub') {
+                parentGroup.style.display = 'block';
+            } else {
+                parentGroup.style.display = 'none';
+                document.getElementById('parent_id').value = '';
+            }
+        }
+
+        function openAddTaskModal() {
+            document.getElementById('modalTitle').innerText = 'إضافة مهمة جديدة';
+            document.getElementById('submitBtn').innerText = 'حفظ المهمة';
+            document.getElementById('task_id').value = '';
+            document.getElementById('project_id').value = '';
+            document.getElementById('task_type').value = 'main';
+            document.getElementById('parent_id').value = '';
+            document.getElementById('title').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('assigned_to').value = '';
+            document.getElementById('priority').value = 'medium';
+            document.getElementById('status').value = 'new';
+            toggleParentTaskSelect();
             document.getElementById('taskModal').style.display = 'flex';
         }
+
+        function openEditTaskModal(task) {
+            document.getElementById('modalTitle').innerText = 'تعديل المهمة';
+            document.getElementById('submitBtn').innerText = 'تحديث المهمة';
+            document.getElementById('task_id').value = task.id;
+            document.getElementById('project_id').value = task.project_id || '';
+            
+            if (task.parent_id) {
+                document.getElementById('task_type').value = 'sub';
+                document.getElementById('parent_id').value = task.parent_id;
+            } else {
+                document.getElementById('task_type').value = 'main';
+                document.getElementById('parent_id').value = '';
+            }
+            toggleParentTaskSelect();
+
+            document.getElementById('title').value = task.title || '';
+            document.getElementById('description').value = task.description || '';
+            document.getElementById('assigned_to').value = task.assigned_to || '';
+            document.getElementById('priority').value = task.priority || 'medium';
+            document.getElementById('status').value = task.status || 'new';
+            document.getElementById('taskModal').style.display = 'flex';
+        }
+
         function closeTaskModal() {
             document.getElementById('taskModal').style.display = 'none';
         }
