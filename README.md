@@ -91,3 +91,13 @@ Final Testing
 Code Review
 Documentation
 Final Submission Preparation
+
+## Running the Project Locally
+
+1. Install XAMPP.
+2. Start Apache and MySQL.
+3. Create a database named `project_management` using phpMyAdmin.
+   *(إذا قمتِ بتصدير ملف SQL ووضعتيه في مجلد، يمكنكِ إضافة: "Import the provided database SQL file from the repository into phpMyAdmin")*
+4. Configure the local database connection in `db.php` (make sure database name, username, and password match your local XAMPP settings).
+5. Place the project inside the XAMPP `htdocs` directory.
+6. Open the project through the local Apache server (e.g., `http://localhost/task-management-system`).
